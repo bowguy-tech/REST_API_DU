@@ -2,7 +2,8 @@
 
 header("Content-Type: application/json");
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET");
+header("Access-Control-Allow-Methods: GET, DELETE, PATCH, POST");
+header("Access-Control-Allow-Headers: Content-Type");
 
 
 $host = 'localhost';
@@ -10,30 +11,16 @@ $dbname = 'crm';
 $user = 'root';
 $password = '';
 
-try {
- 
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    $request = $_SERVER['REQUEST_URI'];
-    $method = $_SERVER['REQUEST_METHOD'];
-    
-    #GET 
-    if ($method === 'GET') {
-        if (preg_match('/\/firms\/(\d+)/', $request, $matches)) {
-            $id = intval($matches[1]);
-            getFirmById($pdo, $id);
-        } elseif (preg_match('/\/firms/', $request)) {
-            getAllFirms($pdo);
-        } else {
-            sendResponse(404, ["error" => "Invalid endpoint"]);
-        }
 
-/*
+  
+ /*  
+this is my table:
+
+id INT
 active TINYINT
 name VARCHAR(500)|
 surname VARCHAR(500)|
-email VARCHAR(500)
-phone varchar(14)
+Z
 subject_id INT
 source VARCHAR(500)|
 date_of_contract DATE
@@ -45,185 +32,212 @@ brigade VARCHAR(500)
 practice VARCHAR(500)
 cv TINYINT
 note VARCHAR (500)
-c14 VARCHAR(500)
-c15 VARCHAR(500)
-c16 VARCHAR(500)
-c17 VARCHAR(500)
-c18 VARCHAR(500)
-c19 VARCHAR(500)
-c20 VARCHAR(500)
-c22 VARCHAR(500)
-c23 VARCHAR(500)
-c24 VARCHAR(500)
-c25 VARCHAR(500)
-c31 VARCHAR(500)
-c32 VARCHAR(500)
-c33 VARCHAR(500)
+
+*/
+
+/* my rest api
+/firms/list	get
+/firms/save	post
+/firms/update	patch
+/firms/remove	delete
+ */
+
+
+//list
+switch ($_SERVER['REQUEST_METHOD']) {
+    case 'GET':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'list') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('SELECT * FROM firms');
+                $stmt->execute();
+                $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode($result);
+                exit;
+            }
+        }
+        break;
+
+//save
+    case 'POST':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'save') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('INSERT INTO firms (active, name, surname, subject_id, source, date_of_contract, date_of_2_contract, date_of_meeting, result, workshop, brigade, practice, cv, note) VALUES (:active, :name, :surname, :subject_id, :source, :date_of_contract, :date_of_2_contract, :date_of_meeting, :result, :workshop, :brigade, :practice, :cv, :note)');
+                $stmt->execute($_POST);
+                echo json_encode(array('id' => $db->lastInsertId()));
+                exit;
+            }
+        }
+        break;
+
+//update
+    case 'PATCH':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'update') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('UPDATE firms SET active = :active, name = :name, surname = :surname, subject_id = :subject_id, source = :source, date_of_contract = :date_of_contract, date_of_2_contract = :date_of_2_contract, date_of_meeting = :date_of_meeting, result = :result, workshop = :workshop, brigade = :brigade, practice = :practice, cv = :cv, note = :note WHERE id = :id');
+                $stmt->execute($_POST);
+                echo json_encode(array('id' => $_POST['id']));
+                exit;
+            }
+        }
+        break;
+
+//delete
+    case 'DELETE':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'remove') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('DELETE FROM firms WHERE id = :id');
+                $stmt->execute(array('id' => $url[2]));
+                exit;
+            }
+        }
+        break;
+
+
+/*my 2nd table:
+id INT
+firm_id INT
+main INT
+active_c TINYINT
+name VARCHAR(500)
+surname VARCHAR(500)
+email VARCHAR(500)
+phone VARCHAR(14)
+vokativ VARCHAR (100)
 */
 
 
-    } elseif ($method === 'POST') {
-        if(preg_match('/\/firms/', $request)) { // <-- TODO: add /firms/save or whatever (regex)
-            $data = json_decode(file_get_contents('php://input'), true);
-            $stmt = $pdo->prepare("INSERT INTO firms (active, name, surname, email, phone, subject_id, source, date_of_contract, date_of_2_contract, date_of_meeting, result, workshop, brigade, practice, cv, note, c14, c15, c16, c17, c18, c19, c20, c22, c23, c24, c25, c31, c32, c33) VALUES (:active, :name, :surname, :email, :phone, :subject_id, :source, :date_of_contract, :date_of_2_contract, :date_of_meeting, :result, :workshop, :brigade, :practice, :cv, :note, :c14, :c15, :c16, :c17, :c18, :c19, :c20, :c22, :c23, :c24, :c25, :c31, :c32, :c33)");
-            $stmt->execute($data);
-            sendResponse(201, ["id" => $pdo->lastInsertId()]);
-        } else {
-            sendResponse(404, ["error" => "Invalid endpoint"]);
+/* my 2nd rest api:
+/firms/contact/save	post
+/firms/contact/update	patch
+/firms/contact/remove	delete
+ */
+
+
+//save
+    case 'POST':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'contact' && $url[2] == 'save') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('INSERT INTO contacts (firm_id, main, active_c, name, surname, email, phone, vokativ) VALUES (:firm_id, :main, :active_c, :name, :surname, :email, :phone, :vokativ)');
+                $stmt->execute($_POST);
+                echo json_encode(array('id' => $db->lastInsertId()));
+                exit;
+            }
         }
-    } 
+        break;
+
+//update
+    case 'PATCH':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'contact' && $url[2] == 'update') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('UPDATE contacts SET firm_id = :firm_id, main = :main, active_c = :active_c, name = :name, surname = :surname, email = :email, phone = :phone, vokativ = :vokativ WHERE id = :id');
+                $stmt->execute($_POST);
+                echo json_encode(array('id' => $_POST['id']));
+                exit;
+            }
+        }
+        break;
+
+//delete
+    case 'DELETE':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'contact' && $url[2] == 'remove') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('DELETE FROM contacts WHERE id = :id');
+                $stmt->execute(array('id' => $url[3]));
+                exit;
+            }
+        }
+        break;
     
+/*this is my 3rd table:
+
+id INT
+firm_id INT
+path VARCHAR(500)
+
+*/
+
+/*my 3rd rest api:
+/firms/card/list	get
+/firms/card/save	post
+/firms/card/update	patch
+/firms/card/delete	delete
+ */
+
     
-    
-    else { 
-        sendResponse(405, ["error" => "Method not allowed"]);
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, DELETE, PATCH");
-header("Access-Control-Allow-Headers: Content-Type");
-
-
-$host = 'localhost';
-$dbname = 'your_database_name';
-$user = 'your_username';
-$password = 'your_password';
-
-
-
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $user, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-    $request = $_SERVER['REQUEST_URI'];
-    $method = $_SERVER['REQUEST_METHOD'];
-
-    if ($method === 'PATCH') {
-        if (preg_match('/\/firms\/update\/(\d+)/', $request, $matches)) {
-            $id = intval($matches[1]);
-            $data = json_decode(file_get_contents('php://input'), true);
-            updateFirmById($pdo, $id, $data);
-        } else {
-            sendResponse(404, ["error" => "Invalid endpoint"]);
+    //list
+    case 'GET':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'card' && $url[2] == 'list') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('SELECT id, firm_id, path FROM cards WHERE firm_id = :firm_id');
+                $stmt->execute(array('firm_id' => $url[3]));
+                $result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode($result);
+                exit;
+            }
         }
-    } elseif ($method === 'GET') {
-        if (preg_match('/\/firms\/list/', $request)) {
-            getAllFirms($pdo);
-        } elseif (preg_match('/\/firms\/(\d+)/', $request, $matches)) {
-            $id = intval($matches[1]);
-            getFirmById($pdo, $id);
-        } else {
-            sendResponse(404, ["error" => "Invalid endpoint"]);
+        break;
+
+    //save
+    case 'POST':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'card' && $url[2] == 'save') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('INSERT INTO cards (firm_id, path) VALUES (:firm_id, :path)');
+                $stmt->execute(array(
+                    'firm_id' => $url[3],
+                    'path' => $_POST['path']
+                ));
+                echo json_encode(array('id' => $db->lastInsertId()));
+                exit;
+            }
         }
-    } elseif ($method === 'DELETE') {
-        if (preg_match('/\/firms\/remove\/(\d+)/', $request, $matches)) {
-            $id = intval($matches[1]);
-            deleteFirmById($pdo, $id);
-        } else {
-            sendResponse(404, ["error" => "Invalid endpoint"]);
+        break;
+
+    //update
+    case 'PATCH':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'card' && $url[2] == 'update') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('UPDATE cards SET firm_id = :firm_id, path = :path WHERE id = :id');
+                $stmt->execute(array(
+                    'firm_id' => $url[3],
+                    'path' => $_POST['path'],
+                    'id' => $_POST['id']
+                ));
+                echo json_encode(array('id' => $_POST['id']));
+                exit;
+            }
         }
-    } else {
-        sendResponse(405, ["error" => "Method not allowed"]);
+        break;
+
+    //delete
+    case 'DELETE':
+        if (isset($_GET['url'])) {
+            $url = explode('/', $_GET['url']);
+            if ($url[0] == 'firms' && $url[1] == 'card' && $url[2] == 'remove') {
+                $db = new PDO('mysql:host='.$host.';dbname='.$dbname, $user, $password);
+                $stmt = $db->prepare('DELETE FROM cards WHERE id = :id');
+                $stmt->execute(array('id' => $url[3]));
+                exit;
+            }
+        }
+        break;
     }
-
-
-function updateFirmById($pdo, $id, $data) {
-    if (empty($data)) {
-        sendResponse(400, ["error" => "No data provided for update"]);
-    }
-
-   
-    $fields = [];
-    $params = [];
-    foreach ($data as $key => $value) {
-        $fields[] = "$key = :$key";
-        $params[$key] = $value;
-    }
-
-    $sql = "UPDATE firms SET " . implode(", ", $fields) . " WHERE id = :id";
-    $params['id'] = $id;
-
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
-
-    if ($stmt->rowCount() > 0) {
-        sendResponse(200, ["message" => "Firm with ID $id has been updated"]);
-    } else {
-        sendResponse(404, ["error" => "Firm not found or no changes made"]);
-    }
-}
-
-
-function getAllFirms($pdo) {
-    $stmt = $pdo->query("SELECT * FROM firms");
-    $firms = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    sendResponse(200, $firms);
-}
-
-
-function getFirmById($pdo, $id) {
-    $stmt = $pdo->prepare("SELECT * FROM firms WHERE id = :id");
-    $stmt->execute(['id' => $id]);
-    $firm = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($firm) {
-        sendResponse(200, $firm);
-    } else {
-        sendResponse(404, ["error" => "Firm not found"]);
-    }
-}
-
-function deleteFirmById($pdo, $id) {
-    $stmt = $pdo->prepare("DELETE FROM firms WHERE id = :id");
-    $stmt->execute(['id' => $id]);
-
-    if ($stmt->rowCount() > 0) {
-        sendResponse(200, ["message" => "Firm with ID $id has been deleted"]);
-    } else {
-        sendResponse(404, ["error" => "Firm not found"]);
-    }
-}
-
-
-
-function getAllFirms($pdo) {
-    $stmt = $pdo->query("SELECT * FROM firms");
-    $firms = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    sendResponse(200, $firms);
-}
-
-
-function getFirmById($pdo, $id) {
-    $stmt = $pdo->prepare("SELECT * FROM firms WHERE id = :id");
-    $stmt->execute(['id' => $id]);
-    $firm = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($firm) {
-        sendResponse(200, $firm);
-    } else {
-        sendResponse(404, ["error" => "Firm not found"]);
-    }
-}
-} catch (PDOException $e) {
-    sendResponse(500, ["error" => "Database connection failed: " . $e->getMessage()]);
-}
-function sendResponse($status, $data) {
-    http_response_code($status);
-    echo json_encode($data);
-    exit();
-}
-
-function sendResponse($status, $data) {
-    http_response_code($status);
-    echo json_encode($data);
-    exit();
-}
